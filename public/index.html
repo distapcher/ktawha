@@ -1,19 +1,79 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>KTA Balance Tracker</title>
+  <meta charset="UTF-8" />
+  <title>Keeta Token Balances Tracker</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 2rem auto; }
+    textarea { width: 100%; height: 150px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.3rem 0.6rem; text-align: center; }
+    th { background: #eee; }
+  </style>
 </head>
 <body>
-  <h1>Keeta ($KTA) Balance Tracker</h1>
-  <form id="walletForm">
-    <textarea id="wallets" rows="10" cols="50" placeholder="Введите адреса кошельков по одному в строке"></textarea><br>
-    <button type="submit">Submit</button>
-  </form>
-  <table id="resultTable" border="1">
-    <thead></thead>
-    <tbody></tbody>
-  </table>
-  <script src="script.js"></script>
+
+<h1>Отслеживание балансов $KTA по кошелькам в сети Base</h1>
+
+<form id="walletForm">
+  <label for="wallets">Введите список кошельков (по одному на строку):</label><br />
+  <textarea id="wallets" name="wallets" placeholder="0x1234...&#10;0x5678..."></textarea><br />
+  <button type="submit">Показать балансы</button>
+</form>
+
+<div id="result"></div>
+
+<script>
+  const form = document.getElementById('walletForm');
+  const resultDiv = document.getElementById('result');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const wallets = formData.get('wallets');
+
+    const resp = await fetch('/balances', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallets })
+    });
+    const data = await resp.json();
+    renderTable(data.wallets, data.balancesHistory);
+
+    // Запускаем опрос на обновления каждую минуту
+    if (!window.updateInterval) {
+      window.updateInterval = setInterval(async () => {
+        const res = await fetch('/balancesHistory');
+        const d = await res.json();
+        renderTable(d.wallets, d.balancesHistory);
+      }, 60 * 1000);
+    }
+  });
+
+  function renderTable(wallets, history) {
+    if (wallets.length === 0) {
+      resultDiv.innerHTML = '<p>Введите кошельки и отправьте форму.</p>';
+      return;
+    }
+    // Заголовок таблицы: №, адрес, даты
+    let html = '<table><thead><tr><th>#</th><th>Кошелек</th>';
+    for (const day of history) {
+      html += `<th>${day.date}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    for (let i = 0; i < wallets.length; i++) {
+      html += `<tr><td>${i + 1}</td><td>${wallets[i]}</td>`;
+      for (const day of history) {
+        html += `<td>${day.balances[i] ?? '-'}</td>`;
+      }
+      html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    resultDiv.innerHTML = html;
+  }
+</script>
+
 </body>
 </html>
